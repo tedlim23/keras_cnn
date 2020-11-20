@@ -1,0 +1,94 @@
+import sys
+sys.path.append('D:\\experimental\\cutout\\src')
+
+import itertools
+import os
+import json
+
+import matplotlib.pylab as plt
+import numpy as np
+import tensorflow as tf
+from sklearn.model_selection import KFold
+
+import preprocess.dataset as dataset
+import preprocess.models as models
+import dpath 
+
+print("TF version:", tf.__version__)
+print("GPU available : ", tf.config.list_physical_devices('GPU'))
+print("CUDA status: ",tf.test.is_built_with_cuda())
+
+def count_class(y):
+    cnts = [0,0]
+    for onehot in y:
+        onehot = onehot.tolist()
+        ind = onehot.index(1)
+        cnts[ind] += 1
+    return cnts
+
+def train_fold(X, Y, train_index, test_index):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = Y[train_index], Y[test_index]
+    print("y_train", count_class(y_train))
+    print("y_test", count_class(y_test))
+
+    # model = models.get_mbv2()
+    model = models.get_resnet50()
+    # model = models.fine_tune(model, 99)
+    model = models.compile_model(model, "sgd", "binary")
+    
+    batch_size = 64
+    trainset = dataset.path2data(X_train, y_train, batch_size)
+    valset = dataset.path2data(X_test, y_test, batch_size)
+
+    steps_per_epoch = len(X_train) // batch_size
+    validation_steps = len(X_test) // batch_size
+    num_epoch = 100
+    hist = model.fit(
+        trainset,
+        epochs=num_epoch, steps_per_epoch=steps_per_epoch,
+        validation_data=valset,
+        validation_steps=validation_steps
+    ).history
+
+    return model, hist
+    
+
+def main():
+    dataname = 'inscape'
+    path_dict = {
+        'fruit': [dpath.fruit_newdir, dpath.fresh_dir_train, dpath.rot_dir_train],
+        'inscape': [dpath.inscape_newdir, dpath.ok_dir_train, dpath.ng_dir_train],
+        'dworld': [dpath.dworld_newdir, dpath.ok_dir_train, dpath.ng_dir_train]
+    }
+    x1dir = os.path.join(path_dict[dataname][0], path_dict[dataname][1])
+    x2dir = os.path.join(path_dict[dataname][0], path_dict[dataname][2])
+
+    X, Y = dataset.read_imgpath(x1dir, x2dir)
+    Y = dataset.onehot_encode(Y)
+
+    scores = []
+    kf = KFold(n_splits=3)
+    kf.get_n_splits(X)
+    for k, (train_index, test_index) in enumerate(kf.split(X)):
+        print("# of train: ", len(train_index))
+        print("# of test: ", len(test_index))
+
+        model, modelhist = train_fold(X, Y, train_index, test_index)
+        modelname = f'model_fold_{k}.h5'
+        model.save_weights(f"src/saved/{modelname}")
+        
+        losses = modelhist['val_loss']
+        scores.append(float(np.mean(losses)))
+    
+    min_score = min(scores)
+    with open("src/saved/result.json", "w+") as jf:
+        myd = {
+            'dataname': dataname,
+            'score': min_score,
+            'fold': scores.index(min_score)
+        }
+        json.dump(myd, jf)
+        jf.close()
+
+    print("scores : ", scores)
