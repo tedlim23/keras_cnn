@@ -19,7 +19,8 @@ print("GPU available : ", tf.config.list_physical_devices('GPU'))
 print("CUDA status: ",tf.test.is_built_with_cuda())
 
 def count_class(y):
-    cnts = [0,0]
+    num_classes = len(y[0])
+    cnts = [0 for i in range(num_classes)]
     for onehot in y:
         onehot = onehot.tolist()
         ind = onehot.index(1)
@@ -32,10 +33,12 @@ def train_fold(X, Y, train_index, test_index):
     print("y_train", count_class(y_train))
     print("y_test", count_class(y_test))
 
+    num_classes = len(y_train[0])
+    print(f'{num_classes} classes are found')
     # model = models.get_mbv2()
-    model = models.get_resnet50()
+    model = models.get_resnet50(num_classes)
     # model = models.fine_tune(model, 99)
-    model = models.compile_model(model, "sgd", "binary")
+    model = models.compile_model(model, "sgd", "categorical")
     
     batch_size = 64
     trainset = dataset.path2data(X_train, y_train, batch_size)
@@ -55,16 +58,25 @@ def train_fold(X, Y, train_index, test_index):
     
 
 def main():
-    dataname = 'inscape'
+    dataname = 'implant'
     path_dict = {
-        'fruit': [dpath.fruit_newdir, dpath.fresh_dir_train, dpath.rot_dir_train],
-        'inscape': [dpath.inscape_newdir, dpath.ok_dir_train, dpath.ng_dir_train],
-        'dworld': [dpath.dworld_newdir, dpath.ok_dir_train, dpath.ng_dir_train]
+        ## dataname : [resize_dir, class1_dir, ... , classN_dir, original_dir, file_extension]
+        'fruit': [dpath.fruit_newdir, dpath.fresh_dir_train, dpath.rot_dir_train, dpath.fruit_dir, "png"],
+        'inscape': [dpath.inscape_newdir, dpath.ok_dir_train, dpath.ng_dir_train, dpath.inscape_dir, "bmp"],
+        'dworld': [dpath.dworld_newdir, dpath.ok_dir_train, dpath.ng_dir_train, dpath.dworld_dir, "bmp"],
+        'hanrim': [dpath.hanrim_newdir, dpath.ok_dir_train, dpath.ng_dir_train, dpath.hanrim_dir, "jpg"],
+        'implant': [dpath.implant_newdir, dpath.implant_D_train, dpath.implant_I_train, dpath.implant_O_train, dpath.implant_dir, "png"],
     }
-    x1dir = os.path.join(path_dict[dataname][0], path_dict[dataname][1])
-    x2dir = os.path.join(path_dict[dataname][0], path_dict[dataname][2])
 
-    X, Y = dataset.read_imgpath(x1dir, x2dir)
+    path_list = path_dict[dataname]
+    X_dir = []
+    for subpath in path_list[1:-2]:
+        target_dir = os.path.join(path_list[0], subpath)
+        if not os.path.exists(target_dir):
+            dataset.resize_to_dir(path_list[-2], subpath, path_list[0], ext = path_list[-1])
+        X_dir.append(target_dir)
+    
+    X, Y = dataset.read_imgpath(X_dir, ext = path_list[-1])
     Y = dataset.onehot_encode(Y)
 
     scores = []

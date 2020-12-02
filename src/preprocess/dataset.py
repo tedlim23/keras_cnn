@@ -20,31 +20,33 @@ def resize_to_dir(rootdir, subdir, dstdir, ext):
         os.makedirs(newdir)
     
     for imgpath in imgset:
-        img = cv2.imread(imgpath, cv2.IMREAD_COLOR)
-        fname = os.path.basename(imgpath)
-        fname_png = fname.split(ext)[0]+".png"
-        resized = cv2.resize(img, rsize, interpolation = cv2.INTER_LINEAR)
-        newpath = os.path.join(newdir, fname_png)
-        cv2.imwrite(newpath, resized)
+        try:
+            img = cv2.imread(imgpath, cv2.IMREAD_COLOR)
+            fname = os.path.basename(imgpath)
+            fname_png = fname.split(ext)[0]+".png"
+            resized = cv2.resize(img, rsize, interpolation = cv2.INTER_LINEAR)
+            newpath = os.path.join(newdir, fname_png)
+            cv2.imwrite(newpath, resized)
+        except Exception as ex:
+            print(f'Unable to resize : {ex}')
 
-def read_imgpath(x1dir, x2dir):
-    x1 = []
-    x2 = []
-    for root, dirs, files in os.walk(x1dir):
-        for j, filename in enumerate(files):
-            if '.jpg' in filename or '.png' in filename or '.bmp' in filename:
-                full_path = os.path.join(root, filename)
-                x1.append(full_path)
-    for root, dirs, files in os.walk(x2dir):
-        for j, filename in enumerate(files):
-            if '.jpg' in filename or '.png' in filename or '.bmp' in filename:
-                full_path = os.path.join(root, filename)
-                x2.append(full_path)
-                
-    y1 = [0 for i in range(len(x1))]
-    y2 = [1 for i in range(len(x2))]
-    X = np.asarray([*x1, *x2])
-    Y = np.asarray([*y1, *y2])
+def read_imgpath(x_dir, ext = "png"):
+    num_classes = len(x_dir)
+    x_all = []
+    ext = "."+ext
+    class_cnts = [0 for i in range(num_classes)]
+    for i, x in enumerate(x_dir):
+        for root, dirs, files in os.walk(x):
+            for filename in files:
+                if ext in filename:
+                    full_path = os.path.join(root, filename)
+                    x_all.append(full_path)
+                    class_cnts[i] += 1
+
+    X = np.asarray(x_all)
+    label_idx = [i for i in range(num_classes)]
+    Y = np.repeat(label_idx, class_cnts)
+    # import pdb; pdb.set_trace()
 
     np.random.seed(21)
     np.random.shuffle(X)
@@ -72,8 +74,9 @@ def dbg_img(img):
     
 
 def path2data(imglist, labels, batch_size):
-    imgset = [[] for i in range(len(labels[0]))]
-    labelset = [[] for i in range(len(labels[0]))]
+    num_classes = len(labels[0])
+    imgset = [[] for i in range(num_classes)]
+    labelset = [[] for i in range(num_classes)]
     for i, imgpath in enumerate(imglist):
         image = tf.keras.preprocessing.image.load_img(
             imgpath, grayscale=False, color_mode="rgb", target_size=None, interpolation="linear"
@@ -105,7 +108,7 @@ def path2data(imglist, labels, batch_size):
     print("TF datasets have been loaded successfully")
     print("Total Train Length :", total_len)
 
-    choice_dataset =  tf.data.Dataset.range(2).repeat()
+    choice_dataset =  tf.data.Dataset.range(num_classes).repeat()
     choice_dataset = choice_dataset.shuffle(buffer_size = total_len)
     input_dataset = tf.data.experimental.choose_from_datasets(dataset, choice_dataset)
     input_dataset = input_dataset.batch(batch_size)

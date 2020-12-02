@@ -4,6 +4,7 @@ import os
 import json
 from tensorflow import keras as K
 import numpy as np
+import preprocess.dataset as dataset
 import preprocess.models as models 
 import dpath
 
@@ -86,18 +87,29 @@ def get_metrics(confmat):
     return acc, mean_recall, mean_prec
 
 def main():
+    path_dict = {
+        ## dataname : [resize_dir, class1_dir, ... , classN_dir, original_dir, file_extension]
+        'fruit': [dpath.fruit_newdir, dpath.fresh_dir_test, dpath.rot_dir_test, dpath.fruit_dir, "png"],
+        'inscape': [dpath.inscape_newdir, dpath.ok_dir_test, dpath.ng_dir_test, dpath.inscape_dir, "bmp"],
+        'dworld': [dpath.dworld_newdir, dpath.ok_dir_test, dpath.ng_dir_test, dpath.dworld_dir, "bmp"],
+        'hanrim': [dpath.hanrim_newdir, dpath.ok_dir_test, dpath.ng_dir_test, dpath.hanrim_dir, "jpg"],
+        'implant': [dpath.implant_newdir, dpath.implant_D_test, dpath.implant_I_test, dpath.implant_O_test, dpath.implant_dir, "png"],
+    }
+
     dataname, weight_path = load_train_result()
+    path_list = path_dict[dataname]
+    num_classes = len(path_list[1:-2])
+    
     # model = models.get_mbv2()
-    model = models.get_resnet50()
-    model = models.compile_model(model, "sgd", "binary")
+    model = models.get_resnet50(num_classes)
+    model = models.compile_model(model, "sgd", "categorical")
     model.load_weights(weight_path)
 
-    num_classes = 2
-    path_dict = {
-        'fruit': [dpath.fruit_newdir, dpath.fresh_dir_test, dpath.rot_dir_test],
-        'inscape': [dpath.inscape_newdir, dpath.ok_dir_test, dpath.ng_dir_test],
-        'dworld': [dpath.dworld_newdir, dpath.ok_dir_test, dpath.ng_dir_test]
-    }
+    for subpath in path_list[1:-2]:
+        target_dir = os.path.join(path_list[0], subpath)
+        if not os.path.exists(target_dir):
+            dataset.resize_to_dir(path_list[-2], subpath, path_list[0], ext = path_list[-1])
+
     imglist = []
     for i in range(num_classes):
         rootdir = os.path.join(path_dict[dataname][0], path_dict[dataname][i+1])
