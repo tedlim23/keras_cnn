@@ -47,9 +47,16 @@ def fine_tune(model, layer_num):
     return model
 
 def compile_model(model, opt, loss):
+    lr_schedule = K.optimizers.schedules.ExponentialDecay(
+        0.01,
+        decay_steps=100000,
+        decay_rate=0.96,
+        staircase=True
+    )
+    
     opt_options = {
         "adam" : K.optimizers.Adam(lr=0.0001),
-        "sgd": K.optimizers.SGD(lr=0.005, momentum=0.9)
+        "sgd": K.optimizers.SGD(lr=0.005, momentum=0.9, nesterov=True)
     }
     loss_options = {
         'binary': K.losses.BinaryCrossentropy(),

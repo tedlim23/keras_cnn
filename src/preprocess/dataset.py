@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import preprocess.aug as aug
+import random
 
 def resize_to_dir(rootdir, subdir, dstdir, ext):
     ext = "."+ext
@@ -48,9 +49,9 @@ def read_imgpath(x_dir, ext = "png"):
     Y = np.repeat(label_idx, class_cnts)
     # import pdb; pdb.set_trace()
 
-    np.random.seed(21)
+    np.random.seed(1204)
     np.random.shuffle(X)
-    np.random.seed(21)
+    np.random.seed(1204)
     np.random.shuffle(Y)
 
     return X, Y
@@ -73,10 +74,16 @@ def dbg_img(img):
     cv2.destroyAllWindows()
     
 
-def path2data(imglist, labels, batch_size):
+def path2data(imglist, labels, batch_size, mode, expr):
     num_classes = len(labels[0])
     imgset = [[] for i in range(num_classes)]
     labelset = [[] for i in range(num_classes)]
+
+    def _put_img_lbl(onehot, input_arr):
+        ind = np.argmax(onehot)
+        imgset[ind].append(input_arr)
+        labelset[ind].append(onehot)
+    
     for i, imgpath in enumerate(imglist):
         image = tf.keras.preprocessing.image.load_img(
             imgpath, grayscale=False, color_mode="rgb", target_size=None, interpolation="linear"
@@ -84,15 +91,27 @@ def path2data(imglist, labels, batch_size):
         input_arr = tf.keras.preprocessing.image.img_to_array(image)
         # input_arr = tf.keras.applications.mobilenet_v2.preprocess_input(input_arr)
         input_arr = tf.keras.applications.resnet.preprocess_input(input_arr)
-        input_arr = aug.cutout(input_arr)
-        # dbg_img(input_arr)
-        
-        onehot = labels[i]
-        ind = np.argmax(onehot)
-        imgset[ind].append(input_arr)
-        labelset[ind].append(onehot) 
-    
 
+        onehot = labels[i]
+        if mode == "train" and expr > 0:
+            const05 = 0.5
+            rannum = random.uniform(0, 1)
+            if rannum > const05:
+                if expr == 2:
+                    input_arr = aug.hflip(input_arr)
+                    input_arr = aug.vflip(input_arr)
+               
+                input_arr = aug.cutout(input_arr)
+                # print("aug_DONE!")
+
+                if len(input_arr.shape) == 4: ## crop applied
+                    for img in input_arr:
+                        _put_img_lbl(onehot, img)
+                else:
+                    _put_img_lbl(onehot, input_arr)
+        else:
+            _put_img_lbl(onehot, input_arr)
+            
     imgset = np.asarray(imgset)
     labelset = np.asarray(labelset)
     

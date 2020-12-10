@@ -86,7 +86,7 @@ def get_metrics(confmat):
 
     return acc, mean_recall, mean_prec
 
-def main():
+def main(expr):
     path_dict = {
         ## dataname : [resize_dir, class1_dir, ... , classN_dir, original_dir, file_extension]
         'fruit': [dpath.fruit_newdir, dpath.fresh_dir_test, dpath.rot_dir_test, dpath.fruit_dir, "png"],
@@ -94,6 +94,8 @@ def main():
         'dworld': [dpath.dworld_newdir, dpath.ok_dir_test, dpath.ng_dir_test, dpath.dworld_dir, "bmp"],
         'hanrim': [dpath.hanrim_newdir, dpath.ok_dir_test, dpath.ng_dir_test, dpath.hanrim_dir, "jpg"],
         'implant': [dpath.implant_newdir, dpath.implant_D_test, dpath.implant_I_test, dpath.implant_O_test, dpath.implant_dir, "png"],
+        'autoever': [dpath.autoever_newdir, dpath.autoever_ok_test, dpath.autoever_p1_test, dpath.autoever_p2_test, dpath.autoever_dir, "png"],
+        'chest': [dpath.chest_newdir, dpath.chest_ok_test, dpath.chest_ng_test, dpath.chest_dir, "jpeg"],
     }
 
     dataname, weight_path = load_train_result()
@@ -133,8 +135,14 @@ def main():
             np.add.at(confmat, (clsidx, pred_cls), 1)
     print("\nInference Complete")
 
-    print(f"confmat: \n", confmat)
     acc, mean_recall, mean_prec = get_metrics(confmat)
-    print("acc: ", acc)
-    print("mean_recall: ", mean_recall)
-    print("mean_prec: ", mean_prec)
+    print(f"confmat: \n {confmat}")
+    print(f"acc: {acc}")
+    print(f"mean_recall: {mean_recall}", )
+    print(f"mean_prec: {mean_prec}", )
+    with open(f"{SAVED}\\{dataname}_2ndexp_prediction_exp{expr}.txt", "w+") as txtf:
+        txtf.write(f"confmat: \n {confmat}")
+        txtf.write(f"\nacc: {acc}")
+        txtf.write(f"\nmean_recall: {mean_recall}", )
+        txtf.write(f"\nmean_prec: {mean_prec}", )
+        txtf.close()
